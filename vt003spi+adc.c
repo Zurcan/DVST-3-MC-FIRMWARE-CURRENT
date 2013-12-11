@@ -1,0 +1,1335 @@
+/*****************************************************
+This program was produced by the
+CodeWizardAVR V2.03.4 Standard
+Automatic Program Generator
+© Copyright 1998-2008 Pavel Haiduc, HP InfoTech s.r.l.
+http://www.hpinfotech.com
+
+Project : 
+Version : 
+Date    : 29.07.2010
+Author  : 
+Company : 
+Comments: 
+
+
+Chip type           : ATmega168P
+Program type        : Application
+Clock frequency     : 1 MHz
+Memory model        : Small
+External RAM size   : 0
+Data Stack size     : 256
+*****************************************************/
+
+//#include <mega168.h>
+
+#include <delay.h>
+
+//#include <stdio.h>
+
+#include <data_arrays.h>
+
+//#include <stdlib.h>
+#include <math.h>
+//#include <data_arrays.c>
+
+
+char rxEnable=0, txEnable=1;
+
+
+
+
+#define RXB8 1
+#define TXB8 0
+#define UPE 2
+#define OVR 3
+#define FE 4
+#define UDRE 5
+#define RXC 7
+//#define disable_uart UCSR0B=0xc0
+//#define enable_uart UCSR0B=0xd8
+//#define disable_uart UCSR0B=0x00
+//#define enable_uart UCSR0B=0x18
+//#define enable_transmit UCSR0B=0x08
+//#define enable_recieve UCSR0B=0x10
+#define alarm3_75mA 0x3c00
+#define alarm22mA 0x6000
+#define FRAMING_ERROR (1<<FE)
+#define PARITY_ERROR (1<<UPE)
+#define DATA_OVERRUN (1<<OVR)
+#define DATA_REGISTER_EMPTY (1<<UDRE)
+#define RX_COMPLETE (1<<RXC)
+#define RxEn UCSR0B=(UCSR0B&0xc0)|0x10
+#define TxEn UCSR0B=(UCSR0B&0xc0)|0x08
+#define Transmit PORTD.3=0//=PORTD&0xf7
+#define Recieve PORTD.3=1//PORTD|0x08
+#define wait_startOCD EICRA=0x03
+#define wait_stopOCD EICRA=0x00
+#define disable_uart UCSR0B=0xc0
+#define disable_eints {EIMSK=0x00;EIFR=0x00;}
+#define enable_eints {EIMSK=0x01;EIFR=0x01;}
+//#define enable_led PORTD=PORTD|0x40
+//#define disable_led PORTD=PORTD&0xbf
+#define start_wait_Rx_timer {TIMSK0=0x01;TCCR0A=0x00;TCCR0B=0x04;TCNT0=0xA0;}
+#define stop_wait_Rx_timer {TIMSK0=0x00;TCCR0A=0x00;TCCR0B=0x00;TCNT0=0x00;}
+#define disable_SPI {SPCR=0x12;}
+#define enable_SPI {SPCR=0x52;}
+#define DAC_max_val 0xffc0
+#define mamps_toDAC_default_ratio 0.00024437928
+#define setlevel_0_10 {PORTD.7=0;PORTD.6=0;}
+#define setlevel_0_20 {PORTD.7=0;PORTD.6=1;}
+#define setlevel_0_30 {PORTD.7=1;PORTD.6=0;}
+#define setlevel_0_50 {PORTD.7=1;PORTD.6=1;}
+// USART Receiver buffer
+#define RX_BUFFER_SIZE0 64
+
+//eeprom unsigned int ADC_PV_calibration_point1_10;
+//eeprom unsigned int buf;
+//eeprom unsigned int ADC_PV_calibration_point2_10;
+//eeprom unsigned int ADC_PV_calibration_point1_20;
+//eeprom unsigned int ADC_PV_calibration_point2_20;
+//eeprom unsigned int ADC_PV_calibration_point1_30;
+//eeprom unsigned int ADC_PV_calibration_point2_30;
+//eeprom unsigned int ADC_PV_calibration_point1_50;
+//eeprom unsigned int ADC_PV_calibration_point2_50;
+float DAC_to_current_ratio=1;
+unsigned int calibration_point1;
+unsigned int calibration_point2;
+eeprom unsigned int ADC_PV_calibration_point1[4];
+eeprom unsigned int ADC_PV_calibration_point2[4];
+eeprom char rangeIndexEep;
+eeprom char CalibrationConfigChanged;
+eeprom float calibrationKeep[4];
+eeprom float calibrationBeep[4];
+eeprom int crceep = 0x0000;
+eeprom const int crcstatic = 0x105D;
+eeprom char tmpEepPriValCode = 0x6d;
+//eeprom unsigned int serial_address=0x0000;
+//flash const unsigned long *serial @0x00100;
+char rangeIndex;
+float calibrationK;
+float calibrationB;
+unsigned int tmp_calibration, crc;
+unsigned int ADC_PV_zero_val=0x0001;
+char rx_buffer0[RX_BUFFER_SIZE0];
+char string_tmp[4];
+//char *str[4];
+char com_data_rx[25];
+float dynamic_variables[3];         //0 - скорость, 1 - ток, 2 - %диапазона
+char dataToSave,sensor_address=0x02,com_bytes_rx=0,update_args_flag=0,p_bank_addr=0;
+void transmit_HART(void); int check_recieved_message(); int generate_command_data_array_answer(char command_recieved);
+void update_eeprom_parameters(char update_flag);
+void start_transmit(int transmit_param); void clear_buffer();
+void CalculateCalibrationRates();
+void ResetDeviceSettings(char notreset);
+void  CRC_update(unsigned char d);
+void PerformDeviceApplicationErase();
+void (*voidFuncPtr)(void);
+int read_program_memory (int adr);
+#if RX_BUFFER_SIZE0<256
+unsigned char rx_wr_index0,rx_rd_index0,rx_counter0,echo;
+#else
+unsigned int rx_wr_index0,rx_rd_index0,rx_counter0,SPI_data;
+#endif
+// This flag is set on USART Receiver buffer overflow
+bit rx_buffer_overflow0,printflag=0,RxTx=0,new_data=0,message_recieved=0,answering=0,burst_mode=0;
+flash  int crctable[256]= {
+        0x0000, 0xC1C0, 0x81C1, 0x4001, 0x01C3, 0xC003, 0x8002, 0x41C2, 0x01C6, 0xC006,
+        0x8007, 0x41C7, 0x0005, 0xC1C5, 0x81C4, 0x4004, 0x01CC, 0xC00C, 0x800D, 0x41CD,
+        0x000F, 0xC1CF, 0x81CE, 0x400E, 0x000A, 0xC1CA, 0x81CB, 0x400B, 0x01C9, 0xC009,
+        0x8008, 0x41C8, 0x01D8, 0xC018, 0x8019, 0x41D9, 0x001B, 0xC1DB, 0x81DA, 0x401A,
+        0x001E, 0xC1DE, 0x81DF, 0x401F, 0x01DD, 0xC01D, 0x801C, 0x41DC, 0x0014, 0xC1D4,
+        0x81D5, 0x4015, 0x01D7, 0xC017, 0x8016, 0x41D6, 0x01D2, 0xC012, 0x8013, 0x41D3,
+        0x0011, 0xC1D1, 0x81D0, 0x4010, 0x01F0, 0xC030, 0x8031, 0x41F1, 0x0033, 0xC1F3,
+        0x81F2, 0x4032, 0x0036, 0xC1F6, 0x81F7, 0x4037, 0x01F5, 0xC035, 0x8034, 0x41F4,
+        0x003C, 0xC1FC, 0x81FD, 0x403D, 0x01FF, 0xC03F, 0x803E, 0x41FE, 0x01FA, 0xC03A, 
+        0x803B, 0x41FB, 0x0039, 0xC1F9, 0x81F8, 0x4038, 0x0028, 0xC1E8, 0x81E9, 0x4029,
+        0x01EB, 0xC02B, 0x802A, 0x41EA, 0x01EE, 0xC02E, 0x802F, 0x41EF, 0x002D, 0xC1ED,
+        0x81EC, 0x402C, 0x01E4, 0xC024, 0x8025, 0x41E5, 0x0027, 0xC1E7, 0x81E6, 0x4026,
+        0x0022, 0xC1E2, 0x81E3, 0x4023, 0x01E1, 0xC021, 0x8020, 0x41E0, 0x01A0, 0xC060, 
+        0x8061, 0x41A1, 0x0063, 0xC1A3, 0x81A2, 0x4062, 0x0066, 0xC1A6, 0x81A7, 0x4067,
+        0x01A5, 0xC065, 0x8064, 0x41A4, 0x006C, 0xC1AC, 0x81AD, 0x406D, 0x01AF, 0xC06F,
+        0x806E, 0x41AE, 0x01AA, 0xC06A, 0x806B, 0x41AB, 0x0069, 0xC1A9, 0x81A8, 0x4068, 
+        0x0078, 0xC1B8, 0x81B9, 0x4079, 0x01BB, 0xC07B, 0x807A, 0x41BA, 0x01BE, 0xC07E,
+        0x807F, 0x41BF, 0x007D, 0xC1BD, 0x81BC, 0x407C, 0x01B4, 0xC074, 0x8075, 0x41B5, 
+        0x0077, 0xC1B7, 0x81B6, 0x4076, 0x0072, 0xC1B2, 0x81B3, 0x4073, 0x01B1, 0xC071,
+        0x8070, 0x41B0, 0x0050, 0xC190, 0x8191, 0x4051, 0x0193, 0xC053, 0x8052, 0x4192, 
+        0x0196, 0xC056, 0x8057, 0x4197, 0x0055, 0xC195, 0x8194, 0x4054, 0x019C, 0xC05C,
+	0x805D, 0x419D, 0x005F, 0xC19F, 0x819E, 0x405E, 0x005A, 0xC19A, 0x819B, 0x405B, 
+	0x0199, 0xC059, 0x8058, 0x4198, 0x0188, 0xC048, 0x8049, 0x4189, 0x004B, 0xC18B,
+	0x818A, 0x404A, 0x004E, 0xC18E, 0x818F, 0x404F, 0x018D, 0xC04D, 0x804C, 0x418C,
+	0x0044, 0xC184, 0x8185, 0x4045, 0x0187, 0xC047, 0x8046, 0x4186, 0x0182, 0xC042,
+	0x8043, 0x4183, 0x0041, 0xC181, 0x8180, 0x4040};
+long  adc_data, DAC_data, SPI_tData ;
+char SPI_tEnd=1,checking_result=0,preambula_bytes=5,preambula_bytes_rec=0,bytes_quantity_ans=0,bytes_quantity_q=0,data_q=0, command_rx_val=0;
+// USART Receiver interrupt service routine
+char Command_data[25];
+
+int read_program_memory (int adr)
+{
+       #asm
+       LPM R22,Z+;//     загрузка в регистр R23 содержимого флеш по адресу Z с постинкрементом (мл. байт)
+       LPM R23,Z; //     загрузка в регистр R22 содержимого Flash  по адресу Z+1 (старший байт)
+       MOV R30, R22;
+       MOV R31, R23;
+       #endasm
+}  
+void  CRC_update(unsigned char d)
+{
+  //unsigned char uindex;
+  //uindex = CRCHigh^d;
+  //CRCHigh=CRCLow^((int)crctable[uindex]>>8);
+  //CRCLow=crctable[uindex];
+  //crc = CRCHigh;
+  //crc = ((int)crc)<<8+CRCLow;     
+  crc = crctable[((crc>>8)^d)&0xFF] ^ (crc<<8);
+}      
+
+interrupt [TIM0_OVF] void timer0_ovf_isr(void)     //таймер, который ждет необходимое число циклов, соответствующее появлению сигнала на детекторе несущей
+{
+enable_eints;
+wait_stopOCD;
+}
+
+// Declare your global variables here
+interrupt [USART_RXC] void usart_rx_isr(void)//прием по USART
+{
+
+char status,data;
+#asm("cli")
+status=UCSR0A;
+
+data=UDR0;
+//#asm("sei")
+if ((status & (FRAMING_ERROR | PARITY_ERROR | DATA_OVERRUN))==0)//если нет ошибок, то читаем данные в буфере USART
+   {
+   rx_buffer0[rx_wr_index0]=data;
+   if (++rx_wr_index0 == RX_BUFFER_SIZE0) rx_wr_index0=0;
+   if (++rx_counter0 == RX_BUFFER_SIZE0)
+      {
+      rx_counter0=0;
+      rx_buffer_overflow0=1;
+    
+     };
+   };
+ #asm("sei")   
+}
+  
+#ifndef _DEBUG_TERMINAL_IO_
+// Get a character from the USART Receiver buffer
+#define _ALTERNATE_GETCHAR_
+#pragma used+
+char getchar(void) //не используется
+{
+char data;
+while (rx_counter0==0);
+data=rx_buffer0[rx_rd_index0];
+if (++rx_rd_index0 == RX_BUFFER_SIZE0) rx_rd_index0=0;
+#asm("cli")
+--rx_counter0;
+#asm("sei")
+return data;
+}
+#pragma used-
+#endif
+
+// USART Transmitter buffer
+#define TX_BUFFER_SIZE0 64
+char tx_buffer0[TX_BUFFER_SIZE0];
+
+#if TX_BUFFER_SIZE0<256
+unsigned char tx_wr_index0,tx_rd_index0,tx_counter0;
+#else
+unsigned int tx_wr_index0,tx_rd_index0,tx_counter0;
+#endif
+
+// USART Transmitter interrupt service routine
+interrupt [USART_TXC] void usart_tx_isr(void)//передача по USART соответственно
+{
+#asm("cli")
+if (tx_counter0)
+   {
+   --tx_counter0;
+   
+   UDR0=tx_buffer0[tx_rd_index0];
+
+   if (++tx_rd_index0 == TX_BUFFER_SIZE0) tx_rd_index0=0;
+   };
+   #asm("sei")   
+}
+
+#ifndef _DEBUG_TERMINAL_IO_
+// Write a character to the USART Transmitter buffer
+#define _ALTERNATE_PUTCHAR_
+#pragma used+
+void putchar(char c)                                       //не используется
+{
+//while (tx_counter0 == TX_BUFFER_SIZE0);
+//#asm("cli")
+//if (tx_counter0 || ((UCSR0A & DATA_REGISTER_EMPTY)==0))
+//   {
+//   tx_buffer0[tx_wr_index0]=c;
+//   if (++tx_wr_index0 == TX_BUFFER_SIZE0) tx_wr_index0=0;
+//   ++tx_counter0;
+//   }
+//else
+while ((UCSR0A & DATA_REGISTER_EMPTY)==0)
+   UDR0=c;
+//#asm("sei")
+}
+
+
+// External Interrupt 0 service routine
+interrupt [EXT_INT0] void ext_int0_isr(void)//первоначально прерывание работает по нарастающему уровню (set_rising_edge_int), а затем ловим низкий (set_falling_edge_int), это устанавливаем уже в таймере, с последующим запуском нашего любимого таймера.1-прием, 0- передача. 
+//изменено, таймер, отсчитывающий задержку, сейчас не активен, пользуемся только OCD ногой модема
+{
+//RxTx=!RxTx;//RxTx=0 =>no recieve ||RxTx=1 => recieve||
+//if(RxTx)Recieve;
+if(EICRA==0x03)                    //если сработало прерывание по верхнему уровню, то переключаемся на отлов нижнего уровня и наоборот
+                {
+                Recieve;
+                RxEn;
+                //wait_stopOCD;
+                //start_wait_Rx_timer;
+                //disable_eints;
+                wait_stopOCD;           //EICRA=0x00
+                message_recieved=0;
+                //mono_channel_mode;
+                }
+else 
+                {
+                //Transmit;
+                
+                //stop_wait_Rx_timer;
+                wait_startOCD;            //EICRA=0x03
+                disable_uart;             //отключаем USART, переходим в режим приема
+                message_recieved=1;
+                
+                }
+//start_check_OCD_timer;//стартуем таймер отсчитывающий задержку 3.33 мс (4 цикла при минимальной частоте 1200Гц)
+
+}
+
+
+#pragma used-
+#endif
+// ADC interrupt service routine
+interrupt [ADC_INT] void adc_isr(void)//прерывания ацп по завершению преобразования
+{
+//#asm("cli")
+delay_us(10);
+adc_data=ADCW;
+printflag=1;
+ADMUX=0x20;
+ADCSRA=0x4f;
+//#asm("sei")
+}
+
+
+// SPI interrupt service routine
+interrupt [SPI_STC] void spi_isr(void)       //прерывание по SPI, в случае, если один фрейм SPI отправлен, оно срабатывает  
+{                                              // в случае необходимости, либо продлевает фрейм, либо финализирует
+
+//#asm
+  //  in   r30,spsr
+  //  in   r30,spdr
+//#endasm
+//data=SPDR;
+//SPCR=0xD0;
+//SPSR=0x00;
+// Place your code here
+if(SPI_tEnd==0){
+SPDR=0xff;
+SPI_tEnd=1;
+}
+else PORTB.2=0;
+ADCSRA=0xcf;
+
+}
+
+void transmit_SPI(unsigned int SPI_data,char SPI_mode){//4 режима работы: 2-норма, 0-авария 3.75мА, 1-авария 22мА, 3-моноканал
+//#asm ("cli")                                          //прерывания мы здесь не используем, потому как с ними получается какой-то гемор
+delay_us(10);
+PORTB.2=0;
+if(SPI_mode<2)
+{
+SPDR=SPI_mode;
+if(SPI_mode==0)SPI_data=alarm3_75mA;
+else SPI_data=alarm22mA;
+while(SPSR<0x80){;}
+}
+if(SPI_mode==3){
+SPI_data=0;}
+if(SPI_mode==2)
+{
+SPDR=(long)(DAC_data>>16);
+while(SPSR<0x80){;}
+}
+SPDR=SPI_data>>8;
+PORTB.2=0;
+while(SPSR<0x80){;}
+SPDR=SPI_data;
+while(SPSR<0x80){;}
+//#asm ("sei")
+}
+
+
+void transmit_HART(void)//подпрограмма передачи в по HART 
+{
+int error_log;
+error_log=check_recieved_message();    //здесь проверяем корректность принятого сообщения и устанавливаем значение переменной "результат проверки"
+if(answering)                         //если нужен ответ
+        {
+        if (!error_log)               //ошибок нет
+                {
+                checking_result=0;                //сбрасываем "результат проверки"
+                rx_wr_index0=0;
+                rx_buffer_overflow0=0;
+                error_log=error_log|(generate_command_data_array_answer(command_rx_val));//здесь обращаемся в генератор массивов ответов по HART
+                start_transmit(error_log);
+                }
+        else
+                { //соответственно, если ошибки есть
+                //PORTD=0x08;
+                Recieve;
+                rx_buffer_overflow0=0;
+                checking_result=0;
+                rx_wr_index0=0;
+                message_recieved=0;
+                start_transmit(error_log);
+                }
+        }
+else                              //ответ по HART не нужен
+        {
+        rx_buffer_overflow0=0;
+        checking_result=0;
+        rx_wr_index0=0;
+        RxEn;
+        Recieve;
+        } 
+clear_buffer();        
+}
+
+void start_transmit(int transmit_param)
+{
+char i=0,j=0;
+char check_sum_tx=0;
+while(UCSR0A<0x20){;}
+//if(!RxTx){
+preambula_bytes=Parameter_bank[3];
+delay_ms(25);
+Transmit;
+TxEn;
+delay_ms(15);
+for (i=0;i<preambula_bytes;i++)
+        {
+        tx_buffer0[i]=0xff;
+        tx_counter0++;
+        }
+//i++;         
+if(burst_mode)tx_buffer0[i]=0x01;//стартовый байт
+else tx_buffer0[i]=0x06;
+check_sum_tx=check_sum_tx^tx_buffer0[i];
+i++; 
+tx_buffer0[i]=rx_buffer0[preambula_bytes_rec-preambula_bytes+i];//адрес
+check_sum_tx=check_sum_tx^tx_buffer0[i];
+i++; 
+tx_buffer0[i]=rx_buffer0[preambula_bytes_rec-preambula_bytes+i];//команда
+check_sum_tx=check_sum_tx^tx_buffer0[i];
+i++; 
+if(!transmit_param)
+        {
+        tx_buffer0[i]=bytes_quantity_ans+2;                                                  //число байт  //нужно создать массив с количеством байт для конкретной команды
+        check_sum_tx=check_sum_tx^tx_buffer0[i];
+        i++; 
+        tx_buffer0[i]=p_bank_addr;                                             //статус 1й байт
+        check_sum_tx=check_sum_tx^tx_buffer0[i]; 
+        i++;      
+        tx_buffer0[i]=0x00;                                             //статус 2й байт
+        check_sum_tx=check_sum_tx^tx_buffer0[i];
+        i++; 
+        for(j=0;j<bytes_quantity_ans;j++)
+                {
+                tx_buffer0[i]=Command_data[j];                                                //данные //здесь нужно создать массив с данными для конкретной команды и перегружать его по запросу в буфер отправки
+                check_sum_tx=check_sum_tx^tx_buffer0[i];
+                i++;
+                }
+        }        
+else {
+        tx_buffer0[i]=com_bytes_rx+2;       //здесь просто берем количество байт из принятого сообщения                                           //число байт  //нужно создать массив с количеством байт для конкретной команды
+        //bytes_quantity_ans=rx_buffer0[preambula_bytes_rec-preambula_bytes+i]+2;  //эту величину все же нужно сохранить, дабы юзать в цикле
+        check_sum_tx=check_sum_tx^tx_buffer0[i];
+        i++;
+        tx_buffer0[i]=transmit_param>>8;                                       //статус 1й байт
+        check_sum_tx=check_sum_tx^tx_buffer0[i];
+        i++;      
+        tx_buffer0[i]=transmit_param;                                          //статус 2й байт
+        check_sum_tx=check_sum_tx^tx_buffer0[i];
+        i++;
+        j=i;
+        for(i=j;i<com_bytes_rx+j;i++)
+                {
+                tx_buffer0[i]=rx_buffer0[preambula_bytes_rec-preambula_bytes+i-2];                                                //данные прямо из массива принятых данных
+                check_sum_tx=check_sum_tx^tx_buffer0[i];
+                //i++; 
+                }
+        }
+        //i++; 
+tx_buffer0[i]=check_sum_tx;
+tx_rd_index0=1;
+//if(!transmit_param){
+//for(i=0;i<=rx_counter0;i++)tx_buffer0[i]=rx_buffer0[i]; }  
+//tx_rd_index0=1;           
+tx_counter0=i;
+UDR0=tx_buffer0[0];
+while(tx_counter0){;}
+delay_ms(15);
+//RxEn;
+Recieve;
+message_recieved=0;
+rx_counter0=0;
+
+}
+
+int generate_command_data_array_answer(char command_recieved)//загружаем из эсппзу сохраненный массив параметров (Parameter_bank) и записываем его в динамический массив команд (Command_data) с помощью связывающего массива (Command_mask)
+{
+char i=0,j=0,k=0;
+char dynamic_parameter=0, writing_command=0, error=1, parameter_tmp=0,parameter_tmp_length=0,tmp_command_number=0;
+union ieeesender      //это объединение создано специально для передачи числа в формате плавающей точки в виде 4х байт
+        {
+        float value;
+        char byte[4];
+        }floatsend;  
+//for (i=0;i<4;i++)
+//        {
+//        str[i]=&string_tmp[i];
+//        }
+//        i=0;
+      
+for (i=0;i<31;i++)//счетчик № команды
+                {
+                if(Command_number[0][i]==command_recieved)
+                                {
+                                error=0;//отсутствие совпадений соответствует ошибке "команда не поддерживается"
+                                tmp_command_number=i;
+                                }
+                }
+if(!error)      {//если ошибок нет, формируем команду
+                writing_command=Command_number[1][tmp_command_number];//команда записи=1
+                dynamic_parameter=Command_number[2][tmp_command_number];//динамический параметр=2               
+                        if(writing_command)
+                                {
+                                for(j=0;j<com_bytes_rx+1;j++)
+                                        {
+                                        Command_data[j]=com_data_rx[j];
+                                        //Parameter_bank[Parameter_mask[parameter_tmp]+(k+parameter_tmp_length-j)];//Command_data[k]=Parameter_bank[Parameter_mask[parameter_tmp]+(k+parameter_tmp_length-j)];
+                                        }
+                                update_args_flag=tmp_command_number;
+                                update_eeprom_parameters(tmp_command_number);               
+                                j=0;                                         
+                                }
+                        else    
+                                {
+                                 //представленный ниже код работает только для команд чтения, нединамических и динамических.
+                                 /* приведенный ниже код работает следующим образом: сперва мы обращаемся к массиву Command_mask
+                                 с помощью которого получаем представление о том, какой параметр соответствует какому байту в команде,
+                                 а также какова его длина в байтах, затем поочередно перезагружаем из массива Parameter_bank данные(которые хранятся в нем последовательно) в 
+                                 массив Command_data, используя для этого массив Parameter_mask (в этом массиве каждому элементу поставлен в прямое соответствие номер параметра
+                                , который мы берем из массива Command_mask, а содержимое каждой ячейки определяет, с какой ячейки начинаются данные соответствующего параметра*/
+                                 parameter_tmp=Command_mask[tmp_command_number][j];
+                                 
+                                 for(j=0;j<24;j++)
+                                         {
+                                         if(parameter_tmp!=Command_mask[tmp_command_number][j])
+                                                     {
+                                                     for(k=(j-parameter_tmp_length);k<j;k++)
+                                                                {
+                                                                if((parameter_tmp<11)|(parameter_tmp>13))                                                                        
+                                                                        {
+                                                                        Command_data[k]=Parameter_bank[Parameter_mask[parameter_tmp]+(k+parameter_tmp_length-j)];
+                                                                        }
+                                                                else 
+                                                                        {
+                                                                         //ttest=(long)dynamic_variables[0];
+                                                                        #asm ("cli")
+                                                                        floatsend.value=dynamic_variables[parameter_tmp-11];
+                                                                        //test=*str[k-1];
+                                                                        Command_data[k]=floatsend.byte[k+parameter_tmp_length-j]; //(char)(test>>8*(k-1)); //(char)((long)((dynamic_variables[Parameter_mask[parameter_tmp]+(k+parameter_tmp_length-j)-11])<<8*(k+parameter_tmp_length-j)));
+                                                                        #asm("sei")
+                                                                        }
+                                                                }
+                                                      parameter_tmp_length=0;
+                                                     }          
+                                         parameter_tmp=Command_mask[tmp_command_number][j];                                                                                                        
+                                         parameter_tmp_length++;
+                                         if(!Command_mask[tmp_command_number][j])j=24;     
+                                         }
+                                 bytes_quantity_ans=k;
+                                 k=0;
+                                }       
+                        }
+
+return error;
+}         
+
+void update_eeprom_parameters(char update_flag)
+{
+char i=0,j=0,k=0,parameter_tmp=0,parameter_tmp_length=0;
+parameter_tmp=Command_mask[update_flag][0];
+
+for(j=0;j<com_bytes_rx+1;j++)
+        {
+                    if(parameter_tmp!=Command_mask[update_flag][j])
+                             {
+                             for(k=(j-parameter_tmp_length);k<j;k++)
+                                    {
+                                    Parameter_bank[Parameter_mask[parameter_tmp]+(k+parameter_tmp_length-j)]=Command_data[k];
+                                    }
+                               parameter_tmp_length=0;                                 
+                             }
+        
+                    parameter_tmp=Command_mask[update_flag][j];                                                                                                        
+                    parameter_tmp_length++;
+                    if(!Command_mask[update_flag][j])j=com_bytes_rx+1;
+        }
+}        
+
+        
+
+int check_recieved_message(){
+char i=0,j=0,k=0,l=0, tmp_i=0;//здесь i - счетчик всех байт j- счетчик байт преамбул
+
+int check_sum=0; 
+checking_result=0;
+answering=1; 
+while ((rx_buffer0[j])==0xff)
+        {
+        if(8<j)
+                {checking_result=0x90;//ошибка формирования фрейма, если количество преамбул больше либо равно количеству символов
+                 //rx_buffer0[i+1]=0x00;
+                 return checking_result;
+                 }
+         j++;        
+        }
+        preambula_bytes_rec=j;
+        i=j;
+if ((rx_buffer0[j])!=0x02)
+//if ((rx_buffer0[i])!=0x02)
+        {
+        checking_result=0x02;
+        //return checking_result;
+        }//диагностируем ошибку команд "неверный выбор", если не от главного устройства
+//else    {
+        check_sum=check_sum^rx_buffer0[i];
+//        }
+i++;         
+if (((rx_buffer0[i])&0x30)!=0x00)
+        {checking_result=0x90;
+        //return checking_result;
+        }
+//burst_mode=(rx_buffer0[i]&0x40)>>6;                          //burst_mode нужно вообще-то прописывать в команде         
+if((rx_buffer0[i]&0x0f)==Parameter_bank[25])answering=1;       //это проверка адреса, если адрес не тот, датчик молчит
+else answering=0;
+check_sum=check_sum^rx_buffer0[i];  
+i++;
+command_rx_val=rx_buffer0[i];// здесь сделаем проверку команды: если она состоит в листе команд, то ошибку не выдаем, если нет => checking_result=0x0600;
+if(command_rx_val==35)
+        {            
+//        tmpEepPriValCode = rx_buffer0[i+2]; 
+//       Parameter_bank[12]= (char)rx_buffer0[i+2];
+        for(l=0;l<4;l++)
+                {
+                Parameter_bank[88+l]=rx_buffer0[i+3+l];
+                Parameter_bank[92+l]=rx_buffer0[i+7+l];
+                }
+        }        
+//if(command_rx_val==36)for(l=0;l<4;l++)Parameter_bank[88+l]=rx_buffer0[i+2+l];
+//if(command_rx_val==37)for(l=0;l<4;l++)Parameter_bank[92+l]=rx_buffer0[i+2+l];
+//if(command_rx_val==38)configuration_changed_flag=0;
+//if(command_rx_val==40)enter_fixed_current_mode(float(rx_buffer0[i+2])||float(rx_buffer0[i+3]<<8)||float(rx_buffer0[i+4]<<16)||float(rx_buffer0[i+5]<<24));
+//if(command_rx_val==41)perform_device_self_test();
+//if(command_rx_val==42)perform_device_reset();
+if(command_rx_val==38)ResetDeviceSettings(0);
+if(command_rx_val==42)
+                                {
+                                if((rx_buffer0[i+2]==0x45)&(rx_buffer0[i+3]==0x52)&(rx_buffer0[i+4]==0x41)&(rx_buffer0[i+5]==0x53)&(rx_buffer0[i+6]==0x45)) //ERASE в ASCII
+                                PerformDeviceApplicationErase();                                                                                                                                     //удаляем штатную прошвку нафиг, доступно только из хексхартлодера
+                                }
+if(command_rx_val==43){
+                        #asm ("cli")            
+                        ADC_PV_calibration_point1[rangeIndex]=adc_data;//ADC_PV_zero_val=adc_data;
+                        calibration_point1=adc_data;
+                        CalibrationConfigChanged=1;
+                        #asm ("sei")
+                        CalculateCalibrationRates();
+                        }
+if(command_rx_val==45)for(l=0;l<4;l++)Parameter_bank[105+l]=rx_buffer0[i+2+l];    //записываем соответствующий току битовый код АЦП
+if(command_rx_val==46)for(l=0;l<4;l++)Parameter_bank[109+l]=rx_buffer0[i+2+l];//записываем соответствующий току битовый код АЦП
+
+if(command_rx_val==111){
+                        #asm ("cli")
+                        ADC_PV_calibration_point2[rangeIndex]=adc_data;
+                        calibration_point2=adc_data;
+                        CalibrationConfigChanged=1;
+                        #asm ("sei")
+                        CalculateCalibrationRates();
+                        }
+check_sum=check_sum^rx_buffer0[i];
+i++; 
+com_bytes_rx=rx_buffer0[i];                    //количество байт, зная их проверяем число байт данных и если оно не совпадает, диагностируем как раз-таки ошибку формирования фрейма 0х9000
+check_sum=check_sum^rx_buffer0[i];
+i++;
+tmp_i=i;
+j=tmp_i;
+for (i=tmp_i;i<tmp_i+com_bytes_rx;i++)
+       {
+       j++;
+       com_data_rx[k]=rx_buffer0[i];
+       check_sum=check_sum^rx_buffer0[i];
+       k++;
+       }
+                //j++;
+//        if(com_bytes_rx!=0)i--;        
+if (j!=i)
+       {checking_result=0x90;
+       //return checking_result;
+       }
+//i++;                
+if(rx_buffer0[i]!=check_sum)
+        {
+        checking_result=0x88;
+        //return checking_result;
+        }                
+return checking_result;
+}
+
+void clear_buffer()
+{
+char i=0;
+for (i=0;i<RX_BUFFER_SIZE0;i++)
+        {
+        rx_buffer0[i]=0;
+        tx_buffer0[i]=0;
+        }
+for (i=0;i<25;i++)
+        {
+        com_data_rx[i]=0;
+        Command_data[i]=0;
+        }
+}        
+// Declare your global variables here
+void system_init_(char initVar){
+#asm("wdr")
+WDTCSR=0x38;
+WDTCSR=0x0E;
+// Crystal Oscillator division factor: 1 
+/*#pragma optsize-
+CLKPR=0x80;
+CLKPR=0x00;
+#ifdef _OPTIMIZE_SIZE_
+#pragma optsize+
+#endif
+  */
+// Input/Output Ports initialization
+// Port B initialization
+// Func7=In Func6=In Func5=Out Func4=In Func3=Out Func2=Out Func1=In Func0=In 
+// State7=T State6=T State5=0 State4=T State3=0 State2=0 State1=T State0=T 
+PORTB=0x00;
+DDRB=0x2c;
+
+// Port C initialization
+// Func6=In Func5=In Func4=In Func3=In Func2=In Func1=In Func0=In 
+// State6=T State5=T State4=T State3=T State2=T State1=T State0=T 
+PORTC=0x00;
+DDRC=0x00;
+
+// Port D initialization
+// Func7=In Func6=In Func5=In Func4=In Func3=In Func2=In Func1=In Func0=In 
+// State7=T State6=T State5=T State4=T State3=T State2=T State1=T State0=T 
+//PORTD=0x00;
+DDRD.3=1;
+PORTD.3=1;
+DDRD.6=1;
+DDRD.7=1;
+PORTD.6=0;
+PORTD.7=0;
+// Timer/Counter 0 initialization
+// Clock source: System Clock
+// Clock value: Timer 0 Stopped
+// Mode: Normal top=FFh
+// OC0A output: Disconnected
+// OC0B output: Disconnected
+//TCCR0A=0x00;
+//TCCR0B=0x04;
+//TCNT0=0xA5;
+//OCR0A=0x00;
+//OCR0B=0x00;
+stop_wait_Rx_timer;
+/*USART predefinition: 1200 baud rate, tx enable, all interrutpts enabled 8bit buffer*/
+UCSR0A=0x00;
+UCSR0B=0xc0;
+UCSR0C=0x06;
+UBRR0H=0x00;
+UBRR0L=0x17;
+
+// Timer/Counter 1 initialization
+// Clock source: System Clock
+// Clock value: Timer 1 Stopped
+// Mode: Normal top=FFFFh
+// OC1A output: Discon.
+// OC1B output: Discon.
+// Noise Canceler: Off
+// Input Capture on Falling Edge
+// Timer 1 Overflow Interrupt: Off
+// Input Capture Interrupt: Off
+// Compare A Match Interrupt: Off
+// Compare B Match Interrupt: Off
+TCCR1A=0x00;
+TCCR1B=0x00;
+TCNT1H=0x00;
+TCNT1L=0x00;
+ICR1H=0x00;
+ICR1L=0x00;
+OCR1AH=0x00;
+OCR1AL=0x00;
+OCR1BH=0x00;
+OCR1BL=0x00;
+
+// Timer/Counter 2 initialization
+// Clock source: System Clock
+// Clock value: Timer 2 Stopped
+// Mode: Normal top=FFh
+// OC2A output: Disconnected
+// OC2B output: Disconnected
+ASSR=0x00;
+TCCR2A=0x00;
+TCCR2B=0x00;
+TCNT2=0x00;
+OCR2A=0x00;
+OCR2B=0x00;
+
+// External Interrupt(s) initialization
+// INT0: On
+// INT0 Mode: Any change
+// INT1: Off
+// Interrupt on any change on pins PCINT0-7: Off
+// Interrupt on any change on pins PCINT8-14: Off
+// Interrupt on any change on pins PCINT16-23: Off
+wait_startOCD;
+EIMSK=0x01;
+EIFR=0x01;
+PCICR=0x00;
+
+
+// Timer/Counter 0 Interrupt(s) initialization
+TIMSK0=0x00;
+// Timer/Counter 1 Interrupt(s) initialization
+TIMSK1=0x00;
+// Timer/Counter 2 Interrupt(s) initialization
+TIMSK2=0x00;
+
+// Analog Comparator initialization
+// Analog Comparator: Off
+// Analog Comparator Input Capture by Timer/Counter 1: Off
+ACSR=0x80;
+ADCSRB=0x00;
+
+// ADC initialization
+// ADC Clock frequency: 230,400 kHz
+// ADC Voltage Reference: AREF pin
+// ADC Auto Trigger Source: Free Running
+// Digital input buffers on ADC0: On, ADC1: Off, ADC2: Off, ADC3: Off
+// ADC4: Off, ADC5: Off
+if(initVar==1)
+{
+DIDR0=0x3f;
+ADMUX=0x20;
+ADCSRA=0xcf;
+ADCSRB=ADCSRB||0x00;
+}
+else
+{
+DIDR0=0x3f;
+ADMUX=0x00;
+ADCSRA=0x0f;
+ADCSRB=ADCSRB||0x00;
+
+}
+// SPI initialization
+// SPI Type: Master
+// SPI Clock Rate: 2*115,200 kHz
+// SPI Clock Phase: Cycle Half
+// SPI Clock Polarity: Low
+// SPI Data Order: MSB First
+SPCR=0x53;
+SPSR=0x00;
+//SPDR=0x00;
+//enable_SPI;
+}
+
+void system_init(){
+#asm("wdr")
+WDTCSR=0x38;
+WDTCSR=0x0E;
+// Crystal Oscillator division factor: 1 
+/*#pragma optsize-
+CLKPR=0x80;
+CLKPR=0x00;
+#ifdef _OPTIMIZE_SIZE_
+#pragma optsize+
+#endif
+  */
+// Input/Output Ports initialization
+// Port B initialization
+// Func7=In Func6=In Func5=Out Func4=In Func3=Out Func2=Out Func1=In Func0=In 
+// State7=T State6=T State5=0 State4=T State3=0 State2=0 State1=T State0=T 
+PORTB=0x00;
+DDRB=0x2c;
+
+// Port C initialization
+// Func6=In Func5=In Func4=In Func3=In Func2=In Func1=In Func0=In 
+// State6=T State5=T State4=T State3=T State2=T State1=T State0=T 
+PORTC=0x00;
+DDRC=0x00;
+
+// Port D initialization
+// Func7=In Func6=In Func5=In Func4=In Func3=In Func2=In Func1=In Func0=In 
+// State7=T State6=T State5=T State4=T State3=T State2=T State1=T State0=T 
+//PORTD=0x00;
+DDRD.3=1;
+PORTD.3=1;
+DDRD.6=1;
+DDRD.7=1;
+PORTD.6=0;
+PORTD.7=0;
+// Timer/Counter 0 initialization
+// Clock source: System Clock
+// Clock value: Timer 0 Stopped
+// Mode: Normal top=FFh
+// OC0A output: Disconnected
+// OC0B output: Disconnected
+//TCCR0A=0x00;
+//TCCR0B=0x04;
+//TCNT0=0xA5;
+//OCR0A=0x00;
+//OCR0B=0x00;
+stop_wait_Rx_timer;
+/*USART predefinition: 1200 baud rate, tx enable, all interrutpts enabled 8bit buffer*/
+UCSR0A=0x00;
+UCSR0B=0xc0;
+UCSR0C=0x06;
+UBRR0H=0x00;
+UBRR0L=0x17;
+
+// Timer/Counter 1 initialization
+// Clock source: System Clock
+// Clock value: Timer 1 Stopped
+// Mode: Normal top=FFFFh
+// OC1A output: Discon.
+// OC1B output: Discon.
+// Noise Canceler: Off
+// Input Capture on Falling Edge
+// Timer 1 Overflow Interrupt: Off
+// Input Capture Interrupt: Off
+// Compare A Match Interrupt: Off
+// Compare B Match Interrupt: Off
+TCCR1A=0x00;
+TCCR1B=0x00;
+TCNT1H=0x00;
+TCNT1L=0x00;
+ICR1H=0x00;
+ICR1L=0x00;
+OCR1AH=0x00;
+OCR1AL=0x00;
+OCR1BH=0x00;
+OCR1BL=0x00;
+
+// Timer/Counter 2 initialization
+// Clock source: System Clock
+// Clock value: Timer 2 Stopped
+// Mode: Normal top=FFh
+// OC2A output: Disconnected
+// OC2B output: Disconnected
+ASSR=0x00;
+TCCR2A=0x00;
+TCCR2B=0x00;
+TCNT2=0x00;
+OCR2A=0x00;
+OCR2B=0x00;
+
+// External Interrupt(s) initialization
+// INT0: On
+// INT0 Mode: Any change
+// INT1: Off
+// Interrupt on any change on pins PCINT0-7: Off
+// Interrupt on any change on pins PCINT8-14: Off
+// Interrupt on any change on pins PCINT16-23: Off
+wait_startOCD;
+EIMSK=0x01;
+EIFR=0x01;
+PCICR=0x00;
+
+
+// Timer/Counter 0 Interrupt(s) initialization
+TIMSK0=0x00;
+// Timer/Counter 1 Interrupt(s) initialization
+TIMSK1=0x00;
+// Timer/Counter 2 Interrupt(s) initialization
+TIMSK2=0x00;
+
+// Analog Comparator initialization
+// Analog Comparator: Off
+// Analog Comparator Input Capture by Timer/Counter 1: Off
+ACSR=0x80;
+ADCSRB=0x00;
+
+// ADC initialization
+// ADC Clock frequency: 230,400 kHz
+// ADC Voltage Reference: AREF pin
+// ADC Auto Trigger Source: Free Running
+// Digital input buffers on ADC0: On, ADC1: Off, ADC2: Off, ADC3: Off
+// ADC4: Off, ADC5: Off
+DIDR0=0x3f;
+ADMUX=0x20;
+ADCSRA=0xcf;
+ADCSRB=ADCSRB||0x00;
+
+// SPI initialization
+// SPI Type: Master
+// SPI Clock Rate: 2*115,200 kHz
+// SPI Clock Phase: Cycle Half
+// SPI Clock Polarity: Low
+// SPI Data Order: MSB First
+SPCR=0x53;
+SPSR=0x00;
+//SPDR=0x00;
+//enable_SPI;
+}
+
+void update_dynamic_vars()
+{
+float DAC_zero_current, DAC_measured_current, Lower_Range_value, Upper_Range_value,tmp;
+char i,j=0;
+long tmp_adc=0;
+
+union DAC_char_to_float 
+        {
+        float value_float;
+        char value_char[4];
+        }DAC_val;
+         
+for (i=0;i<4;i++)
+        {
+         DAC_val.value_char[i]=Parameter_bank[88+i];
+         if(i==3)
+                {
+                Upper_Range_value=DAC_val.value_float;
+                }
+        } 
+for (i=0;i<4;i++)
+        {
+         DAC_val.value_char[i]=Parameter_bank[92+i];
+         if(i==3)
+                {
+                Lower_Range_value=DAC_val.value_float;
+                }
+        } 
+
+for (i=0;i<4;i++)
+        {
+         DAC_val.value_char[i]=Parameter_bank[105+i];
+         if(i==3)
+                {
+                DAC_zero_current=DAC_val.value_float;
+                }
+        } 
+for (i=0;i<4;i++)
+        {
+         DAC_val.value_char[i]=Parameter_bank[109+i];
+         if(i==3)
+                {
+                DAC_measured_current=DAC_val.value_float;
+                }
+        }                      
+//коэффициент преобразования кода ЦАП в ток, равен отношению приращения тока к приращению битового кода АЦП
+if(adc_data<=0)tmp_adc=0;
+//if(adc_data>ADC_PV_calibration_point1)//для калиброванного значения на 4.8 мА
+//else
+else 
+{
+//CalculateCalibrationRates();
+tmp_adc=(long)((float)((float)(adc_data)/calibrationK) - (float)calibrationB);
+//tmp_adc=(long)((float)tmp_adc*1.118);
+if(tmp_adc>0xffc0)tmp_adc=0xffc0;
+if(tmp_adc<0x0000)tmp_adc=0x0000;
+} 
+/*        {
+        tmp_adc=(long)(adc_data-calibration_point1)*((float)(calibration_point2/(calibration_point2-calibration_point1)));//+ADC_PV_calibration_point;
+        DAC_zero_current = 4.8;  
+        DAC_data=((long)(tmp_adc*((DAC_measured_current-DAC_zero_current)/16))+(signed int)((DAC_zero_current)/mamps_toDAC_default_ratio));
+        }
+else    
+        {
+         if(adc_data<=ADC_PV_zero_val)adc_data=0;
+         else
+                {
+                tmp_adc=(long)(adc_data-ADC_PV_zero_val)*((float)(calibration_point2/(calibration_point2-ADC_PV_zero_val)));      
+                }
+                
+        }
+        */
+DAC_data=((long)(tmp_adc*((DAC_measured_current-DAC_zero_current)/16))+(signed int)((DAC_zero_current)/mamps_toDAC_default_ratio));
+if(DAC_data<=DAC_zero_current)DAC_data=DAC_zero_current;
+dynamic_variables[1]=(float)DAC_data*mamps_toDAC_default_ratio;//adc_data*mamps_toDAC_default_ratio;//current, mA - ток
+dynamic_variables[2]=(float)(100*(dynamic_variables[1]-DAC_zero_current)/(DAC_measured_current-DAC_zero_current));
+tmp = Upper_Range_value-Lower_Range_value;
+if(tmp==10)
+    {
+    Parameter_bank[12]= 10;
+    setlevel_0_10;       
+    rangeIndex = 0;
+    }
+if(tmp==20)
+    {
+    Parameter_bank[12]= 20;
+    setlevel_0_20;      
+    rangeIndex = 1;
+    }
+if(tmp==30)
+    {
+    Parameter_bank[12]=30;
+   setlevel_0_30;  
+   rangeIndex = 2;
+    }
+if(tmp==50)
+    {
+    Parameter_bank[12]= 50;
+    setlevel_0_50; 
+    rangeIndex = 3;
+    }
+if(rangeIndexEep!=rangeIndex)
+        {
+         //CalculateCalibrationRates();
+        calibrationB=calibrationBeep[rangeIndex];
+        calibrationK=calibrationKeep[rangeIndex];
+        rangeIndexEep=rangeIndex;
+         
+        }   
+dynamic_variables[0]=(float)dynamic_variables[2]*(float)((tmp)/100);//100;////primary variable (PV) - виброскорость
+}
+
+void CalculateCalibrationRates()
+{
+
+unsigned int calibration_div = 0xf2f7;//0xe4c0;//0xe600;
+unsigned int calibrationBasic5val = 0x0cc9;
+//unsigned int calibrationBasic95val = 0xe4c0;
+//#asm("cli");
+tmp_calibration =calibration_point2 - calibration_point1;
+calibrationK = (float)(tmp_calibration/62199.00);//58560.00);//58880.00);
+calibrationKeep[rangeIndex] =  calibrationK;
+//calibrK = ((tmp_calibration*1000/calibration_div)) ;
+calibrationB = (float)((float)calibration_point1-(float)(calibrationK*calibrationBasic5val)) ;
+calibrationBeep[rangeIndex] = calibrationB;
+//#asm("sei");
+}
+
+
+void ResetDeviceSettings(char notreset)
+{
+int i=0;
+for(i =0; i<139;i++)
+        {
+        if (i==98)i=100;
+        else Parameter_bank[i]=Parameter_defaults[i];
+        }                                                                                   
+        for (i=0; i<4; i++)
+        {
+        calibrationBeep[i]=0;
+        calibrationKeep[i]=1;
+        ADC_PV_calibration_point1[i] = 0x0cc9;//0x0bc0; //0x0cc0;
+        ADC_PV_calibration_point2[i] = 0xffc0;//0xe4c0; //0xf2c0;
+        }
+        calibrationB=0;
+        calibrationK=1;
+        calibration_point1=0x0cc9;//0x0bc0;//0x0cc0;
+        calibration_point2=0xffc0;//0xe4c0;//0xf2c0;
+        rangeIndexEep=1;
+        rangeIndex=rangeIndexEep;
+        //Upper_Range_value = 20;
+        //Lower_Range_value = 0;
+}
+
+void PerformDeviceApplicationErase()
+{
+MCUCR = 0x01;
+MCUCR = 0x02;
+Parameter_bank[0]=0xee;
+Parameter_bank[2]=0xa3;
+voidFuncPtr=(void(*)(void))0x1C00;   //адресс куда переходим
+voidFuncPtr();
+}
+
+void LoadCalibrationSettings(char flag)
+{
+//#asm("cli");
+int i=0;
+if(flag==0x01)
+        {
+        calibration_point1=ADC_PV_calibration_point1[rangeIndexEep];
+        calibration_point2=ADC_PV_calibration_point2[rangeIndexEep];
+        calibrationB=calibrationBeep[rangeIndexEep];
+        calibrationK=calibrationKeep[rangeIndexEep];
+        rangeIndex=rangeIndexEep;
+        }     
+else
+        {
+        rangeIndexEep = 1;
+        rangeIndex = 1;    
+        for (i=0; i<4; i++)
+            {
+            calibrationBeep[i]=0;
+            calibrationKeep[i]=1;
+            ADC_PV_calibration_point1[i] = 0x0cc9;//0x0bc0; //0x0cc0;
+            ADC_PV_calibration_point2[i] = 0xffc0;//0xe4c0; //0xf2c0;
+            } 
+        calibrationB=0;
+        calibrationK=1;
+        calibration_point1=0x0cc9;//0x0bc0;//0x0cc0;
+        calibration_point2=0xffc0;//0xe4c0;//0xf2c0;
+        }   
+  //      #asm("sei");        
+}
+
+void main(void)
+{
+// Declare your local variables here
+//размещаем по адресу 0х00200(адрес указывается в словах, поэтому там будет в 2 раза меньше) 
+
+int i,k=0;
+int char_val=0x00,data, j = 0;
+char dataH,dataL,crcok_flag=0;
+
+//flash unsigned int* SERIAL = &serial_number;
+crc = 0xffff;
+delay_ms(100);
+Parameter_bank[0]=0x11;
+Parameter_bank[2]=0xB3;
+//serial = 0xabcd;
+//#asm
+//    .CSEG
+//    .org    0x00080
+//    .DW 0xabcd, 0x0123  
+//    .org    0x00082
+//    RET
+//    .org    0x38
+//    serial1:  .BYTE 1
+//    .org    0x39
+//    serial2:  .BYTE 1
+//    .org    0x4a
+//    serial3:  .BYTE 1
+   //.db 0xab, 0xcd , $ef , $77
+  //   .org    0x00084  
+  //   RET
+//  
+   // .CSEG
+//#endasm
+//long serial = 0xabcdef12;
+//system_init(0);
+ #asm("wdr")
+while ((data<=65534)|(j<=16382))
+{
+   // if(j==0x1BDE)j+=2;//перескакиваем адрес с контрольной суммой для ПО загрузчика для ПК         
+    if(j==0xDEF)j++;
+    data= read_program_memory (j);
+    dataH = (int)data>>8;
+    dataL = data;
+    CRC_update(dataH);
+    CRC_update(dataL);
+    //crc_rtu(data);
+    //j++;
+    j=j+2;
+}
+crceep = crc;
+//if(crc==crcstatic)system_init(1);
+//else system_init(0);
+ system_init();
+#asm
+    in   r30,spsr
+    in   r30,spdr
+#endasm
+//serial_address = *serial;
+//normal_mode;
+#asm("sei")
+
+setlevel_0_20;
+if(crceep==crcstatic)
+    {
+        
+       // Parameter_bank[107]=0x80;
+//        Parameter_bank[10]=0xBF;
+//        Parameter_bank[11]=0xBC;  
+        LoadCalibrationSettings(CalibrationConfigChanged);
+        CalculateCalibrationRates();
+        transmit_SPI(DAC_data,2);
+        update_dynamic_vars();
+        //enable_uart;
+        RxEn;
+        //PORTD=0x08;
+        Recieve;
+        //disable_eints;
+        while (1)
+              {
+                #asm("wdr")
+                //delay_ms(20);
+                //enable_SPI;
+
+
+        //        }
+        if(message_recieved)
+                {
+                 transmit_HART();
+                }
+        //else
+        //        {
+                ADCSRA=0xcf;
+                update_dynamic_vars();
+                PORTB.2=1;
+                transmit_SPI(DAC_data,2);
+                PORTB.2=0;
+               // }        
+        }
+    }
+else 
+    {
+        RxEn;
+        //PORTD=0x08;
+        Recieve;
+//               Parameter_bank[107]=0x60;
+//               Parameter_bank[10]=(char)crc;
+//               Parameter_bank[11]=(char)(crc>>8);          
+
+        while (1)
+              {
+              // DAC_zero_current=3.5;
+             
+                #asm("wdr")
+                if(message_recieved)
+                {
+                 transmit_HART();
+                }
+                ADCSRA=0x0f;
+                adc_data=0;
+                update_dynamic_vars();
+                PORTB.2=1;
+                transmit_SPI(DAC_data,2);
+                PORTB.2=0;
+      
+        }
+    }     
+#asm
+.CSEG
+varlist: .DW 0x4fd1
+.org 0x0e6f                  //адрес, по которому будет распологаться наш CRC - 0x1BCC, длина - 2 байта , эти 2 байта для проверки со стороны МК мы исключаем, просто перескочив их
+#endasm
+}
