@@ -228,8 +228,8 @@ flash char Command_mask [31][25]=
 
 flash char Command_number [3][31] =    {
 {0,1,2,3,6,11,12,13,14,15,16,17,18,19,35,36,37,38,40,41,42,43,44,45,46,47,48,49,59,108,109},           
-{0,0,0,0,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1},                                       
-{0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},                                       
+{0,0,0,0,1, 0,  0,  0,  0,  0,  0,  1,  1, 1,  1, 1,  1,  1,  1,  1,  1,  1, 1,  1,  1, 1,  0,  1,  1,  1,  1},                                       
+{0,1,1,1,0, 0,  0,  0,  0,  0,  0,  0,  0, 0,  0, 0,  0,  0,  0,  0,  0,  0, 0,  0,  0, 0,  0,  0,  0,  1,  1},                                       
 } ;                                                                              
 
 #pragma used+
@@ -279,20 +279,41 @@ char rxEnable=0, txEnable=1;
 float DAC_to_current_ratio=1;
 unsigned int calibration_point1;
 unsigned int calibration_point2;
-eeprom unsigned int ADC_PV_calibration_point1[4];
-eeprom unsigned int ADC_PV_calibration_point2[4];
-eeprom char rangeIndexEep;
-eeprom char CalibrationConfigChanged;
-eeprom float calibrationKeep[4];
-eeprom float calibrationBeep[4];
-eeprom int crceep = 0x0000;
-eeprom const int crcstatic = 0x105D;
-eeprom char tmpEepPriValCode = 0x6d;
+__eeprom volatile unsigned int ADC_PV_calibration_point1[4];
+__eeprom volatile unsigned int ADC_PV_calibration_point2[4];
+__eeprom volatile unsigned int ADC_PV_calibration_point1_PB1[4];
+__eeprom volatile unsigned int ADC_PV_calibration_point1_PB2[4];
+__eeprom volatile unsigned int ADC_PV_calibration_point2_PB1[4];
+__eeprom volatile unsigned int ADC_PV_calibration_point2_PB2[4];
+__eeprom volatile char  rangeIndexEep;
+__eeprom volatile char  rangeIndexEepPB1;
+__eeprom volatile char  rangeIndexEepPB2;
+__eeprom volatile char CalibrationConfigChanged;
+__eeprom volatile char CalibrationConfigChangedPB1;
+__eeprom volatile char CalibrationConfigChangedPB2;
+__eeprom volatile float calibrationKeep[4];
+__eeprom volatile float calibrationBeep[4];
+__eeprom volatile float calibrationKeep_PB1[4];
+__eeprom volatile float calibrationKeep_PB2[4];
+__eeprom volatile float calibrationBeep_PB1[4];
+__eeprom volatile float calibrationBeep_PB2[4];
+__eeprom int crceep = 0x0000;
+__eeprom const int crcstatic = 0xdcea;
+__eeprom char tmpEepPriValCode = 0x6d;      
+__eeprom char devCodePB1;       
+__eeprom char devCodePB2;
+__eeprom char firmwareRevPB1;
+__eeprom char firmwareRevPB2;
+__eeprom int firmwareCRCPB1;
+__eeprom int firmwareCRCPB2;
+__eeprom char devAddrPB1;
+__eeprom char devAddrPB2;
 
 char rangeIndex;
+char protectBitsChecking;
 float calibrationK;
 float calibrationB;
-unsigned int tmp_calibration, crc;
+unsigned int  crc;
 unsigned int ADC_PV_zero_val=0x0001;
 char rx_buffer0[64];
 char string_tmp[4];
@@ -300,15 +321,29 @@ char string_tmp[4];
 char com_data_rx[25];
 float dynamic_variables[3];         
 char dataToSave,sensor_address=0x02,com_bytes_rx=0,update_args_flag=0,p_bank_addr=0;
-void transmit_HART(void); int check_recieved_message(); int generate_command_data_array_answer(char command_recieved);
+void transmit_HART(void);
+int check_recieved_message(); 
+int generate_command_data_array_answer(char command_recieved);
 void update_eeprom_parameters(char update_flag);
-void start_transmit(int transmit_param); void clear_buffer();
+void start_transmit(int transmit_param); 
+void clear_buffer();
+void checkIntegrityOfCalibrationVars(char index);
 void CalculateCalibrationRates();
 void ResetDeviceSettings(char notreset);
 void  CRC_update(unsigned char d);
 void PerformDeviceApplicationErase();
 void (*voidFuncPtr)(void);
 int read_program_memory (int adr);
+char checkCalibrationFlagValidity();
+char checkSavedRangeValidity();
+char fixIncorrectPB(char checkres);
+char fixIncorrectRIPB(char checkres);
+char checkSMTH();
+char checkCalibrationRatesValidity(char index);
+char fixIncorrectCalibrationRates(char index, char checkres);
+char fixIncorrectIDVars(char);
+void EEPROM_write(unsigned int uiAddress,unsigned char ucData) ;
+unsigned char EEPROM_read(unsigned int uiAddress) ;
 unsigned char rx_wr_index0,rx_rd_index0,rx_counter0,echo;
 
 bit rx_buffer_overflow0,printflag=0,RxTx=0,new_data=0,message_recieved=0,answering=0,burst_mode=0;
@@ -346,12 +381,11 @@ char Command_data[25];
 
 int read_program_memory (int adr)
 {
-#asm
-       LPM R22,Z+;//     загрузка в регистр R23 содержимого флеш по адресу Z с постинкрементом (мл. байт)
-       LPM R23,Z; //     загрузка в регистр R22 содержимого Flash  по адресу Z+1 (старший байт)
-       MOV R30, R22;
-       MOV R31, R23;
-       #endasm
+unsigned int flash *data_point;
+data_point =0x0000;
+data_point+=adr;
+return *data_point;
+
 }  
 void  CRC_update(unsigned char d)
 {
@@ -567,6 +601,9 @@ i++;
 tx_buffer0[i]=rx_buffer0[preambula_bytes_rec-preambula_bytes+i];
 check_sum_tx=check_sum_tx^tx_buffer0[i];
 i++; 
+
+if(command_rx_val == 0x23)
+bytes_quantity_ans = 9;
 if(!transmit_param)
 {
 tx_buffer0[i]=bytes_quantity_ans+2;                                                  
@@ -602,7 +639,8 @@ for(i=j;i<com_bytes_rx+j;i++)
 tx_buffer0[i]=rx_buffer0[preambula_bytes_rec-preambula_bytes+i-2];                                                
 check_sum_tx=check_sum_tx^tx_buffer0[i];
 
-}
+}                          
+
 }
 
 tx_buffer0[i]=check_sum_tx;
@@ -621,7 +659,7 @@ rx_counter0=0;
 
 int generate_command_data_array_answer(char command_recieved)
 {
-char i=0,j=0,k=0;
+char i=0,j=0,k=0,m=0;
 char dynamic_parameter=0, writing_command=0, error=1, parameter_tmp=0,parameter_tmp_length=0,tmp_command_number=0;
 union ieeesender      
 {
@@ -634,12 +672,14 @@ for (i=0;i<31;i++)
 if(Command_number[0][i]==command_recieved)
 {
 error=0;
-tmp_command_number=i;
+tmp_command_number=i;  
+
 }
 }
 if(!error)      {
 writing_command=Command_number[1][tmp_command_number];
 dynamic_parameter=Command_number[2][tmp_command_number];
+
 if(writing_command)
 {
 for(j=0;j<com_bytes_rx+1;j++)
@@ -661,9 +701,29 @@ for(j=0;j<24;j++)
 if(parameter_tmp!=Command_mask[tmp_command_number][j])
 {
 for(k=(j-parameter_tmp_length);k<j;k++)
-{
+{          
+
 if((parameter_tmp<11)|(parameter_tmp>13))                                                                        
+{           
+if(tmp_command_number==26)  
+{             
+if((k < 6)|(k>13))
+Command_data[k]=Parameter_bank[Parameter_mask[parameter_tmp]+(k+parameter_tmp_length-j)];
+else
+{                                             
+if(k<10)                           
 {
+floatsend.value = calibrationKeep[rangeIndexEep];
+Command_data[k] = floatsend.byte[k-6];
+}
+else
+{
+floatsend.value = calibrationBeep[rangeIndexEep];
+Command_data[k] = floatsend.byte[k-10];
+}     
+}
+}
+else
 Command_data[k]=Parameter_bank[Parameter_mask[parameter_tmp]+(k+parameter_tmp_length-j)];
 }
 else 
@@ -683,7 +743,8 @@ parameter_tmp_length++;
 if(!Command_mask[tmp_command_number][j])j=24;     
 }
 bytes_quantity_ans=k;
-k=0;
+k=0;                 
+
 }       
 }
 
@@ -765,22 +826,30 @@ if(command_rx_val==42)
 if((rx_buffer0[i+2]==0x45)&(rx_buffer0[i+3]==0x52)&(rx_buffer0[i+4]==0x41)&(rx_buffer0[i+5]==0x53)&(rx_buffer0[i+6]==0x45)) 
 PerformDeviceApplicationErase();                                                                                                                                     
 }
-if(command_rx_val==43){
+if(command_rx_val==43){                    
 #asm ("cli")            
 ADC_PV_calibration_point1[rangeIndex]=adc_data;
+ADC_PV_calibration_point1_PB1[rangeIndex]=adc_data;
+ADC_PV_calibration_point1_PB2[rangeIndex]=adc_data;                        
 calibration_point1=adc_data;
 CalibrationConfigChanged=1;
+CalibrationConfigChangedPB1=1;
+CalibrationConfigChangedPB2=1;
 #asm ("sei")
 CalculateCalibrationRates();
 }
 if(command_rx_val==45)for(l=0;l<4;l++)Parameter_bank[105+l]=rx_buffer0[i+2+l];    
 if(command_rx_val==46)for(l=0;l<4;l++)Parameter_bank[109+l]=rx_buffer0[i+2+l];
 
-if(command_rx_val==111){
+if(command_rx_val==111){                
 #asm ("cli")
-ADC_PV_calibration_point2[rangeIndex]=adc_data;
+ADC_PV_calibration_point2[rangeIndex]=adc_data;    
+ADC_PV_calibration_point2_PB1[rangeIndex]=adc_data;
+ADC_PV_calibration_point2_PB2[rangeIndex]=adc_data;      
 calibration_point2=adc_data;
-CalibrationConfigChanged=1;
+CalibrationConfigChanged=1;     
+CalibrationConfigChangedPB1=1;
+CalibrationConfigChangedPB2=1;
 #asm ("sei")
 CalculateCalibrationRates();
 }
@@ -811,7 +880,330 @@ checking_result=0x88;
 }                
 return checking_result;
 }
+char checkSavedRangeValidity()
+{
 
+char tmpRI, tmpRIPB1, tmpRIPB2;
+tmpRI =  rangeIndexEep;
+tmpRIPB1 = rangeIndexEepPB1;
+tmpRIPB2 =rangeIndexEepPB2;
+
+if(rangeIndexEepPB2!= rangeIndexEepPB1)      
+{               
+
+if(rangeIndexEep==rangeIndexEepPB2)
+return 1;           
+if(rangeIndexEep==rangeIndexEepPB1)
+return 2;           
+return 3;           
+} 
+
+return 0;   
+
+}
+char fixIncorrectRIPB(char checkres)
+{
+
+switch(checkres)
+{
+case 0:
+{   
+
+rangeIndexEep = rangeIndexEepPB1;
+break;
+}
+case 1:
+{
+rangeIndexEepPB1 = rangeIndexEepPB2;
+break;
+}
+case 2:
+{              
+rangeIndexEepPB2 =  rangeIndexEep;
+break;
+}
+case 3:
+{
+rangeIndexEep=1;
+break;
+}
+default: break;                                                
+}               
+return 0;
+}
+char fixIncorrectPB(char checkres)
+{
+
+switch(checkres)
+{
+case 0:
+{   
+
+CalibrationConfigChanged = CalibrationConfigChangedPB1;
+break;
+}
+case 1:
+{
+CalibrationConfigChangedPB1 = CalibrationConfigChangedPB2;
+break;
+}
+case 2:
+{              
+CalibrationConfigChangedPB2 =  CalibrationConfigChanged;
+break;
+}
+case 3:
+{
+CalibrationConfigChanged=0xff;
+break;
+}
+default: break;                                                
+}             
+return 0;
+}
+
+char checkCalibrationFlagValidity()              
+{
+
+if(CalibrationConfigChangedPB2!= CalibrationConfigChangedPB1)      
+{               
+
+if(CalibrationConfigChanged==CalibrationConfigChangedPB2)
+return 1;           
+if(CalibrationConfigChanged==CalibrationConfigChangedPB1)
+return 2;           
+return 3;           
+} 
+
+return 0;                  
+}
+
+char checkCalibrationRatesValidity(char index)
+{
+if(ADC_PV_calibration_point1[index]==ADC_PV_calibration_point1_PB1[index])                
+{
+if(ADC_PV_calibration_point1[index]!=ADC_PV_calibration_point1_PB2[index])
+return 1;     
+}
+else
+{
+if(ADC_PV_calibration_point1[index]==ADC_PV_calibration_point1_PB2[index])
+return 2;    
+else if(ADC_PV_calibration_point1_PB1[index]==ADC_PV_calibration_point1_PB2[index])      
+{
+return 3;
+
+}                                       
+}
+if(ADC_PV_calibration_point2[index]==ADC_PV_calibration_point2_PB1[index])                
+{
+if(ADC_PV_calibration_point2[index]!=ADC_PV_calibration_point2_PB2[index])
+return 4;    
+}
+else
+{
+if(ADC_PV_calibration_point2[index]==ADC_PV_calibration_point2_PB2[index])
+return 5;    
+else if(ADC_PV_calibration_point2_PB1[index]==ADC_PV_calibration_point2_PB2[index])      
+{
+return 6;      
+
+}                                       
+}
+
+if(calibrationKeep[index]==calibrationKeep_PB1[index])                                        
+{
+if(calibrationKeep[index]!=calibrationKeep_PB2[index])
+return 7;      
+}
+else
+{
+if(calibrationKeep[index]==calibrationKeep_PB2[index])
+return 8;    
+else if(calibrationKeep_PB1[index]==calibrationKeep_PB2[index])
+{
+return 9;      
+
+}                                       
+}  
+
+if(calibrationBeep[index]==calibrationBeep_PB1[index])                                        
+{
+if(calibrationBeep[index]!=calibrationBeep_PB2[index])
+return 10;      
+}
+else
+{
+if(calibrationBeep[index]==calibrationBeep_PB2[index])
+return 11;    
+else if(calibrationBeep_PB1[index]==calibrationBeep_PB2[index])
+{
+return 12;      
+
+}                                       
+} 
+return 0;          
+}
+
+char checkIDVarsValidity()
+{
+if(Parameter_bank[2]!=0xb3)
+Parameter_bank[2]=0xb3;
+if(Parameter_bank[6]!=0x01)
+Parameter_bank[6]=0x01; 
+if(Parameter_bank[11]!=0xBC)
+Parameter_bank[11]=0xBC; 
+if(Parameter_bank[10]!=0xBF)
+Parameter_bank[10]=0xBF; 
+if( Parameter_bank[25]>15)
+Parameter_bank[25] = 0x02;         
+
+return 0;
+}
+
+char fixIncorrectCalibrationRates(char index, char checkres)
+{
+switch(checkres)
+{
+case 0:
+{   
+
+break;
+}
+case 1:
+{
+ADC_PV_calibration_point1_PB2[index]= ADC_PV_calibration_point1[index];
+break;
+}
+case 2:
+{              
+ADC_PV_calibration_point1_PB1[index] =  ADC_PV_calibration_point1[index];
+break;
+}
+case 3:
+{
+ADC_PV_calibration_point1[index] =ADC_PV_calibration_point1_PB1[index] ;
+break;
+}    
+case 4:
+{
+ADC_PV_calibration_point2_PB2[index]= ADC_PV_calibration_point2[index];
+break;
+}
+case 5:
+{              
+ADC_PV_calibration_point2_PB1[index] =  ADC_PV_calibration_point2[index];
+break;
+}
+case 6:
+{
+ADC_PV_calibration_point2[index] =ADC_PV_calibration_point2_PB1[index] ;
+break;
+}    
+case 7:
+{
+calibrationKeep_PB2[index]= calibrationKeep[index];
+break;
+}
+case 8:
+{              
+calibrationKeep_PB1[index] =  calibrationKeep[index];
+break;
+}
+case 9:
+{
+calibrationKeep[index] =calibrationKeep_PB1[index] ;
+break;
+} 
+case 10:
+{
+calibrationBeep_PB2[index]= calibrationBeep[index];
+break;
+}
+case 11:
+{              
+calibrationBeep_PB1[index] =  calibrationBeep[index];
+break;
+}
+case 12:
+{
+calibrationBeep[index] =calibrationBeep_PB1[index] ;
+break;
+}                
+default: break;                                                
+}             
+return 0;
+}
+void checkIntegrityOfCalibrationVars(char index)                               
+{
+
+for(index = 0; index < 4; index++)
+{                    
+if(ADC_PV_calibration_point1[index]==ADC_PV_calibration_point1_PB1[index])                
+{
+if(ADC_PV_calibration_point1[index]!=ADC_PV_calibration_point1_PB2[index])
+ADC_PV_calibration_point1_PB2[index] = ADC_PV_calibration_point1[index];      
+}
+else
+{
+if(ADC_PV_calibration_point1[index]==ADC_PV_calibration_point1_PB2[index])
+ADC_PV_calibration_point1_PB1[index] = ADC_PV_calibration_point1[index];    
+else if(ADC_PV_calibration_point1_PB1[index]==ADC_PV_calibration_point1_PB2[index])      
+{
+ADC_PV_calibration_point1[index] = ADC_PV_calibration_point1_PB1[index];      
+CalculateCalibrationRates();
+}                                       
+}
+if(ADC_PV_calibration_point2[index]==ADC_PV_calibration_point2_PB1[index])                
+{
+if(ADC_PV_calibration_point2[index]!=ADC_PV_calibration_point2_PB2[index])
+ADC_PV_calibration_point2_PB2[index] = ADC_PV_calibration_point2[index];      
+}
+else
+{
+if(ADC_PV_calibration_point2[index]==ADC_PV_calibration_point2_PB2[index])
+ADC_PV_calibration_point2_PB1[index] = ADC_PV_calibration_point2[index];    
+else if(ADC_PV_calibration_point2_PB1[index]==ADC_PV_calibration_point2_PB2[index])      
+{
+ADC_PV_calibration_point2[index] = ADC_PV_calibration_point2_PB1[index];      
+CalculateCalibrationRates();
+}                                       
+}
+
+if(calibrationKeep[index]==calibrationKeep_PB1[index])                                        
+{
+if(calibrationKeep[index]!=calibrationKeep_PB2[index])
+calibrationKeep_PB2[index] = calibrationKeep[index];      
+}
+else
+{
+if(calibrationKeep[index]==calibrationKeep_PB2[index])
+calibrationKeep_PB1[index] = calibrationKeep[index];    
+else if(calibrationKeep_PB1[index]==calibrationKeep_PB2[index])
+{
+calibrationKeep[index] = calibrationKeep_PB1[index];      
+CalculateCalibrationRates();
+}                                       
+}  
+
+if(calibrationBeep[index]==calibrationBeep_PB1[index])                                        
+{
+if(calibrationBeep[index]!=calibrationBeep_PB2[index])
+calibrationBeep_PB2[index] = calibrationBeep[index];      
+}
+else
+{
+if(calibrationBeep[index]==calibrationBeep_PB2[index])
+calibrationBeep_PB1[index] = calibrationBeep[index];    
+else if(calibrationBeep_PB1[index]==calibrationBeep_PB2[index])
+{
+calibrationBeep[index] = calibrationBeep_PB1[index];      
+CalculateCalibrationRates();
+}                                       
+}           
+}
+
+}
 void clear_buffer()
 {
 char i=0;
@@ -1066,7 +1458,8 @@ if(rangeIndexEep!=rangeIndex)
 calibrationB=calibrationBeep[rangeIndex];
 calibrationK=calibrationKeep[rangeIndex];
 rangeIndexEep=rangeIndex;
-
+rangeIndexEepPB1 = rangeIndex;
+rangeIndexEepPB2 = rangeIndex; 
 }   
 dynamic_variables[0]=(float)dynamic_variables[2]*(float)((tmp)/100);
 }
@@ -1076,13 +1469,20 @@ void CalculateCalibrationRates()
 
 unsigned int calibration_div = 0xf2f7;
 unsigned int calibrationBasic5val = 0x0cc9;
+unsigned int tmp_calibration;
 
-tmp_calibration =calibration_point2 - calibration_point1;
+tmp_calibration =ADC_PV_calibration_point2[rangeIndex] - ADC_PV_calibration_point1[rangeIndex];
 calibrationK = (float)(tmp_calibration/62199.00);
 calibrationKeep[rangeIndex] =  calibrationK;
+calibrationKeep_PB1[rangeIndex] = calibrationK;
+calibrationKeep_PB2[rangeIndex] = calibrationK;
 
-calibrationB = (float)((float)calibration_point1-(float)(calibrationK*calibrationBasic5val)) ;
+tmp_calibration = ADC_PV_calibration_point1[rangeIndex];
+
+calibrationB = (float)((float)tmp_calibration-(float)(calibrationK*calibrationBasic5val)) ;
 calibrationBeep[rangeIndex] = calibrationB;
+calibrationBeep_PB1[rangeIndex] = calibrationB;
+calibrationBeep_PB2[rangeIndex] = calibrationB;
 
 }
 
@@ -1100,12 +1500,22 @@ calibrationBeep[i]=0;
 calibrationKeep[i]=1;
 ADC_PV_calibration_point1[i] = 0x0cc9;
 ADC_PV_calibration_point2[i] = 0xffc0;
+ADC_PV_calibration_point1_PB1[i] =  0x0cc9; 
+ADC_PV_calibration_point1_PB2[i] =  0x0cc9;
+ADC_PV_calibration_point2_PB1[i] =  0xffc0; 
+ADC_PV_calibration_point2_PB2[i] =  0xffc0;         
+calibrationBeep_PB1[i] = 0;
+calibrationBeep_PB2[i] = 0;
+calibrationKeep_PB1[i] = 1;
+calibrationKeep_PB2[i] = 1;    
 }
 calibrationB=0;
 calibrationK=1;
 calibration_point1=0x0cc9;
 calibration_point2=0xffc0;
-rangeIndexEep=1;
+rangeIndexEep=1;               
+rangeIndexEepPB1 = 1;
+rangeIndexEepPB2 = 1;
 rangeIndex=rangeIndexEep;
 
 }
@@ -1120,21 +1530,26 @@ voidFuncPtr=(void(*)(void))0x1C00;
 voidFuncPtr();
 }
 
-void LoadCalibrationSettings(char flag)
+void LoadCalibrationSettings(char flag)                    
 {
 
 int i=0;
+
 if(flag==0x01)
-{
+{                   
+
 calibration_point1=ADC_PV_calibration_point1[rangeIndexEep];
 calibration_point2=ADC_PV_calibration_point2[rangeIndexEep];
 calibrationB=calibrationBeep[rangeIndexEep];
 calibrationK=calibrationKeep[rangeIndexEep];
 rangeIndex=rangeIndexEep;
 }     
-else
-{
-rangeIndexEep = 1;
+else  
+{                             
+
+rangeIndexEep = 1; 
+rangeIndexEepPB1 = 1;
+rangeIndexEepPB2 = 1;
 rangeIndex = 1;    
 for (i=0; i<4; i++)
 {
@@ -1142,6 +1557,15 @@ calibrationBeep[i]=0;
 calibrationKeep[i]=1;
 ADC_PV_calibration_point1[i] = 0x0cc9;
 ADC_PV_calibration_point2[i] = 0xffc0;
+ADC_PV_calibration_point1_PB1[i] =  0x0cc9; 
+ADC_PV_calibration_point1_PB2[i] =  0x0cc9;
+ADC_PV_calibration_point2_PB1[i] =  0xffc0; 
+ADC_PV_calibration_point2_PB2[i] =  0xffc0;         
+calibrationBeep_PB1[i] = 0;
+calibrationBeep_PB2[i] = 0;
+calibrationKeep_PB1[i] = 1;
+calibrationKeep_PB2[i] = 1;    
+
 } 
 calibrationB=0;
 calibrationK=1;
@@ -1150,13 +1574,38 @@ calibration_point2=0xffc0;
 }   
 
 }
+void EEPROM_write(unsigned int uiAddress,unsigned char ucData)
+{
+while( EECR & 0b00000010) 
+;
+EEAR=uiAddress;
+EEDR=ucData;
+
+EECR |=0b00000100; 
+EECR |=0b00000010; 
+}
+
+unsigned char EEPROM_read(unsigned int uiAddress)
+{
+while(EECR & 0b00000010) 
+;
+EEAR=uiAddress;
+EECR|=0b00000001; 
+
+return EEDR;
+} 
 
 void main(void)
 {
 
 int i,k=0;
-int char_val=0x00,data, j = 0;
-char dataH,dataL,crcok_flag=0;
+int char_val=0x00,data, j = 0,tmp=0;
+flash int *tmp1;
+char dataH,dataL,crcok_flag=0,checkRes=4,tmpindex = 0;
+char tmpCalibrationFlagPB1 =  CalibrationConfigChangedPB1;
+char tmpCalibrationFlagPB2 =  CalibrationConfigChangedPB2;
+
+rangeIndex = 0;
 
 crc = 0xffff;
 delay_ms(100);
@@ -1185,15 +1634,25 @@ system_init();
 #endasm
 
 #asm("sei")
-
+protectBitsChecking = 0;
 {PORTD.7=0;PORTD.6=1;};
+
+checkIDVarsValidity();
+
 if(crceep==crcstatic)
 {
+#asm("wdr")        
 
-LoadCalibrationSettings(CalibrationConfigChanged);
+if((tmpCalibrationFlagPB1!=0xff)|(tmpCalibrationFlagPB2!=0xff))   
+{     
+checkRes = checkCalibrationFlagValidity();     
+fixIncorrectPB(checkRes) ;       
+}
+
+LoadCalibrationSettings(CalibrationConfigChanged);     
+update_dynamic_vars();
 CalculateCalibrationRates();
 transmit_SPI(DAC_data,2);
-update_dynamic_vars();
 
 (*(unsigned char *) 0xc1)=((*(unsigned char *) 0xc1)&0xc0)|0x10;
 
@@ -1208,11 +1667,25 @@ if(message_recieved)
 transmit_HART();
 }
 
-(*(unsigned char *) 0x7a)=0xcf;
+if(protectBitsChecking ==50)
+{
+protectBitsChecking = 0;
+for(tmpindex = 0; tmpindex < 4; tmpindex++)
+{
+checkRes =  checkCalibrationRatesValidity(tmpindex);
+fixIncorrectCalibrationRates(tmpindex,checkRes);
+
+}         
+CalculateCalibrationRates();     
+
+}        
+
 update_dynamic_vars();
+(*(unsigned char *) 0x7a)=0xcf;
 PORTB.2=1;
 transmit_SPI(DAC_data,2);
-PORTB.2=0;
+PORTB.2=0;      
+protectBitsChecking++;      
 
 }
 }
@@ -1225,18 +1698,30 @@ PORTD.3=1;
 while (1)
 {
 
-#asm("wdr")
+#asm("wdr")           
 if(message_recieved)
 {
 transmit_HART();
 }
+if(protectBitsChecking ==50)
+{
+protectBitsChecking = 0;
+for(tmpindex = 0; tmpindex < 4; tmpindex++)
+{
+checkRes =  checkCalibrationRatesValidity(tmpindex);
+fixIncorrectCalibrationRates(tmpindex,checkRes);
+
+}  
+CalculateCalibrationRates();  
+
+}  
+update_dynamic_vars();
 (*(unsigned char *) 0x7a)=0x0f;
 adc_data=0;
-update_dynamic_vars();
 PORTB.2=1;
 transmit_SPI(DAC_data,2);
-PORTB.2=0;
-
+PORTB.2=0;        
+protectBitsChecking++;
 }
 }     
 #asm
